@@ -2,6 +2,7 @@ using Azure.Identity;
 using BlazorWebAppEntra;
 using BlazorWebAppEntra.Client.Weather;
 using BlazorWebAppEntra.Components;
+using BlazorWebAppEntra.Services;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Azure;
@@ -22,6 +23,7 @@ builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
     {
         msIdentityOptions.CallbackPath = "/signin-oidc";
         msIdentityOptions.ClientId = "{CLIENT ID (BLAZOR APP)}";
+        msIdentityOptions.ClientSecret = "{CLIENT SECRET}";
         msIdentityOptions.Domain = "{DIRECTORY NAME}.onmicrosoft.com";
         msIdentityOptions.Instance = "https://login.microsoftonline.com/";
         msIdentityOptions.ResponseType = "code";
@@ -30,25 +32,25 @@ builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
     .EnableTokenAcquisitionToCallDownstreamApi()
     .AddDownstreamApi("DownstreamApi", configOptions =>
     {
-        configOptions.BaseUrl = "{BASE URL}";
-        configOptions.Scopes = [ "{APP ID URI}/Weather.Get" ];
+        configOptions.BaseUrl = "https://localhost:7277";
+        configOptions.Scopes = ["{APP ID URI}/access_as_user"];
     })
     .AddDistributedTokenCaches();
 
 builder.Services.AddDistributedMemoryCache();
 
 builder.Services.Configure<MsalDistributedTokenCacheAdapterOptions>(
-    options => 
+    options =>
     {
         // Disable L1 Cache default: false
         //options.DisableL1Cache = false;
-        
+
         // L1 Cache Size Limit default: 500 MB
         //options.L1CacheOptions.SizeLimit = 500 * 1024 * 1024;
-        
+
         // Encrypt tokens at rest default: false
         options.Encrypt = true;
-        
+
         // Sliding Expiration default: 1 hour
         //options.SlidingExpiration = TimeSpan.FromHours(1);
     });
@@ -116,6 +118,16 @@ builder.Services.AddRazorComponents()
 builder.Services.AddHttpForwarderWithServiceDiscovery();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IWeatherForecaster, ServerWeatherForecaster>();
+
+// Add named HttpClient
+builder.Services.AddHttpClient("testapi", httpClient =>
+{
+    httpClient.BaseAddress = new Uri("https://localhost:7277");
+});
+
+// Add background services
+builder.Services.AddHostedService<ConsumeScopedServiceHostedService>();
+builder.Services.AddScoped<IScopedProcessingService, ScopedProcessingService>();
 
 var app = builder.Build();
 

@@ -13,7 +13,8 @@ builder.Services.AddAuthentication()
         // Authority format '{AUTHORITY}' for ME-ID tenant type: https://sts.windows.net/{TENANT ID}/
         // Authority format '{AUTHORITY}' for B2C tenant type: https://login.microsoftonline.com/{TENANT ID}/v2.0/
         //
-        jwtOptions.Authority = "{AUTHORITY}";
+        jwtOptions.Authority = "https://sts.windows.net/{TENANT ID}/";
+
         //
         // The following should match just the path of the Application ID URI configured when adding the "Weather.Get" scope
         // under "Expose an API" in the Azure or Entra portal. {CLIENT ID} is the application (client) ID of this 
@@ -22,10 +23,21 @@ builder.Services.AddAuthentication()
         // Audience format '{AUDIENCE}' for ME-ID tenant type: api://{CLIENT ID}
         // Audience format '{AUDIENCE}' for B2C tenant type: https://{DIRECTORY NAME}.onmicrosoft.com/{CLIENT ID}
         //
-        jwtOptions.Audience = "{AUDIENCE}";
+        jwtOptions.Audience = "api://{CLIENT ID}";
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("UserPolicy", policy =>
+        policy.RequireClaim("http://schemas.microsoft.com/identity/claims/scope", "access_as_user"));
+    //policy.RequireAssertion(context =>
+    //{
+    //    var hasClaim = context.User.HasClaim("http://schemas.microsoft.com/identity/claims/scope", "access_as_user");
+    //    testClaim = hasClaim.ToString();
+    //    Console.WriteLine($"Has scp claim with access_as_user: {hasClaim}");
+    //    return hasClaim;
+    //}));
+});
 
 // Add OpenApi 
 builder.Services.AddOpenApi();
@@ -56,15 +68,16 @@ var summaries = new[]
 app.MapGet("/weather-forecast", () =>
 {
     var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
+            new WeatherForecast
+            (
+                DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+                Random.Shared.Next(-20, 55),
+                summaries[Random.Shared.Next(summaries.Length)]
+            ))
         .ToArray();
     return forecast;
-}).RequireAuthorization();
+}).RequireAuthorization(); // Authentication only
+//.RequireAuthorization("UserPolicy");  // Add Authorization (RBAC)
 
 app.Run();
 
